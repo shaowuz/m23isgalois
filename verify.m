@@ -1,40 +1,16 @@
-// ---------------------------------------------------------------------------
-// verify.m
-//
-// Verifies that the splitting field of each of the two degree-23 polynomials f1,
-// f2 in this repository is a Galois extension of Q with group M23 = 23T5.
-// The polynomials are committed here as f1 and f2 (also in polynomial_f1.gp
-// and polynomial_f2.gp).
-//
-// USAGE:
-//     magma
-//     > load "verify.m";
-// or non-interactively (runs and exits, exit code reflects the asserts):
-//     echo 'load "verify.m"; quit;' | magma
-//
-// Two flags at the top control the run:
-//     MODE        "certified"    attempt rigorous certification with GaloisProof
-//                 "conditional"  stop after the unproven GaloisGroup identification
-//     WHICH       "f1", "f2" or "both": which polynomials to run on
-//
-// For each polynomial the script prints it, the transitive-group label 23Tk of
-// the computed group, its order and composition factors, and -- when MODE is
-// "certified" -- whether GaloisProof certified the result.  GaloisProof needs a
-// 64-bit Magma with a large amount of memory free.
-// ---------------------------------------------------------------------------
-
-SetVerbose("GaloisGroup", 1);
+// Run from the repository root. Set MODE and WHICH before loading to override.
+// MODE: "conditional" (GaloisGroup) or "certified" (also GaloisProof).
+// WHICH: "f1", "f2", "f3", "both", "examples", "X", "calX", "families", "all".
+// Family group checks are conditional in either mode.
+if not assigned MODE then MODE := "conditional"; end if;
+if not assigned WHICH then WHICH := "all"; end if;
+assert MODE in {"certified","conditional"};
+assert WHICH in {"f1","f2","f3","both","examples","X","calX","families","all"};
 SetSeed(1);
-
-MODE  := "certified";    // "certified": run GaloisProof; "conditional": no proof
-WHICH := "both";         // "f1", "f2" or "both"
-
-assert MODE in {"certified", "conditional"};
-assert WHICH in {"f1", "f2", "both"};
 
 P<x> := PolynomialRing(Rationals());
 
-// --- f1 --------------------------------------------------------------------
+// f1
 f1 := x^23
     - 184*x^21
     - 1150*x^20
@@ -60,7 +36,7 @@ f1 := x^23
     - 3150159884154;
 
 
-// --- f2 --------------------------------------------------------------------
+// f2
 f2 := x^23
     + 46*x^21
     - 598*x^20
@@ -85,95 +61,89 @@ f2 := x^23
     - 11217790920*x
     + 1243077066;
 
-// ---------------------------------------------------------------------------
-// One polynomial: compute the group, identify it, and optionally certify.
-// Returns true iff GaloisProof certified the result (always false when
-// MODE is "conditional").
-// ---------------------------------------------------------------------------
+// f3
+f3 := x^22 - 10*x^21 - 171*x^20 + 4948*x^19 - 3160*x^18 - 878184*x^17
+ + 1612816*x^16 + 57499538*x^15 - 104404974*x^14 - 1334363150*x^13
+ + 222611762*x^12 + 13957937472*x^11 + 44873894586*x^10 + 48162643482*x^9
+ - 396850048164*x^8 - 2898168029276*x^7 - 8595497273752*x^6
+ - 12865403779026*x^5 - 5309597045808*x^4 + 12770814291390*x^3
+ + 19223398109406*x^2 + 8150987444096*x + 212425572022;
 
-function Check(name, f, MODE)
-
+// The expected discriminants are those of the number fields, not polynomials.
+procedure CheckExample(name,f,expected_discriminant,mode)
     assert IsIrreducible(f);
-
-    printf "\n===========================================================\n";
-    printf "%o = %o\n", name, f;
-
-    printf "computing GaloisGroup ...\n";
-    t0 := Cputime();
-
-    G, Rts, S := GaloisGroup(f);
-
-    printf "done in %o s\n", Cputime(t0);
-    printf "|returned G| = %o\n", #G;
-    printf "returned G is transitive : %o  (degree %o)\n",
-           IsTransitive(G), Degree(G);
-
-    k := TransitiveGroupIdentification(G);
-    printf "returned group = 23T%o\n", k;
-    printf "description    = %o\n", TransitiveGroupDescription(23, k);
-
-    // Magma does not provide a predefined identifier named M23.
-    // Construct 23T5 explicitly from the transitive-group database.
-
-    M23db := TransitiveGroup(23, 5);
-
-    printf "returned G is isomorphic to 23T5 : %o\n", IsIsomorphic(G, M23db);
-    printf "returned G is conjugate to 23T5 in Sym(23) : %o\n",
-           IsConjugate(Sym(23), G, M23db);
-    printf "composition factors of the returned group: %o\n",
-           CompositionFactors(G);
-
-    if k eq 5 and #G eq 10200960 then
-        printf "*** The conditional computation returned 23T5 = M23. ***\n";
-        printf "*** This does NOT yet certify the Galois group of %o. ***\n", name;
+    n := Degree(f);
+    k := n eq 22 select 38 else 5;
+    expected_group := TransitiveGroup(n,k);
+    G, roots, data := GaloisGroup(f);
+    assert IsConjugate(Sym(n),G,expected_group);
+    printf "%o: conditional group identification %oT%o.\n",name,n,k;
+    if mode eq "certified" then
+        assert GaloisProof(f,data);
+        printf "%o: GaloisProof passed.\n",name;
     end if;
+    K := NumberField(f);
+    primes := [pe[1] : pe in Factorization(expected_discriminant)];
+    O := MaximalOrder(K : Ramification := primes);
+    // Reconstruct and check the order without assuming the ramification bound.
+    fresh := NumberField(f);
+    basis := [Evaluate(Polynomial(Eltseq(K!b)),fresh.1) : b in Basis(O)];
+    checked_order := Order(basis);
+    assert Discriminant(checked_order) eq expected_discriminant;
+    assert IsMaximal(checked_order);
+    printf "%o: field discriminant verified.\n",name;
+end procedure;
 
-    certified := false;
-
-    if MODE eq "certified" then
-        printf "\nrunning GaloisProof ...\n";
-        t0 := Cputime();
-
-        ok := GaloisProof(f, S);
-
-        printf "GaloisProof: %o   (%o s)\n", ok, Cputime(t0);
-
-        if ok then
-            printf "*******************************************************\n";
-            printf "*** CERTIFIED: Gal(%o/Q) is the returned group 23T%o. ***\n", name, k;
-            printf "*******************************************************\n";
-            certified := true;
-        else
-            printf "GaloisProof did not certify the conditional result.\n";
-        end if;
-    else
-        printf "\nGaloisProof skipped because MODE is \"conditional\".\n";
-        printf "The identification with M23 remains CONDITIONAL for %o.\n", name;
-    end if;
-
-    return certified;
-
-end function;
-
-// ---------------------------------------------------------------------------
-
-all_ok := true;
-
-// Store each Check result before combining: "and" short-circuits in Magma,
-// so "all_ok and Check(...)" would silently skip the second polynomial
-// whenever the first one is not certified.
-
-if WHICH in {"f1", "both"} then
-    ok1 := Check("f1", f1, MODE);
-    all_ok := all_ok and ok1;
+if WHICH in {"f1","both","examples","all"} then
+    CheckExample("f1",f1,2^36*3^18*23^30,MODE);
+end if;
+if WHICH in {"f2","both","examples","all"} then
+    CheckExample("f2",f2,2^44*7^8*23^24,MODE);
+end if;
+if WHICH in {"f3","examples","all"} then
+    CheckExample("f3",f3,2^22*3^24*23^18*127^8,MODE);
 end if;
 
-if WHICH in {"f2", "both"} then
-    ok2 := Check("f2", f2, MODE);
-    all_ok := all_ok and ok2;
+// These reductions do not implement the appendix's p=411000011 certification.
+load "polynomial_F.m";
+load "polynomial_F_small.m";
+if WHICH in {"X","families","all"} then
+    // Check the change of variable over Q before reducing modulo 31.
+    QQTV<T,V> := PolynomialRing(Rationals(),2);
+    cs := Coefficients(F); ms := Monomials(F);
+    H := &+[cs[i]*T^Degree(ms[i],1)*(37*V-40)^Degree(ms[i],2)
+        *(49*V+32)^(23-Degree(ms[i],2)) : i in [1..#cs]];
+    small := QQTV!F_small;
+    assert H*LeadingCoefficient(small) eq small*LeadingCoefficient(H);
+    print "F and F_small: exact change of variable verified.";
+
+    k := GF(31);
+    kt<t> := FunctionField(k);
+    R<v> := PolynomialRing(kt);
+    f := R!Evaluate(F,[t,v]);
+    g := R!Evaluate(F_small,[t,v]);
+    assert k!(37*32+40*49) ne 0;
+    assert Degree(f) eq 23 and Degree(g) eq 23;
+    assert IsIrreducible(f) and IsIrreducible(g);
+    G := GaloisGroup(f);
+    assert IsConjugate(Sym(23),G,TransitiveGroup(23,5));
+    print "F modulo 31: conditional group identification M23.";
 end if;
 
-if MODE eq "certified" then
-    printf "\nFINAL: %o\n", all_ok select "ALL CERTIFIED" else "NOT ALL CERTIFIED";
-    assert all_ok;
+load "polynomial_calF.m";
+if WHICH in {"calX","families","all"} then
+    k := GF(31);
+    kx<x> := PolynomialRing(k);
+    kt<t> := FunctionField(k);
+    R<v> := PolynomialRing(kt);
+    // The degree-one prime (31,s-12) of L.
+    h := kx!DefiningPolynomial(L);
+    assert Evaluate(h,12) eq 0 and Evaluate(Derivative(h),12) ne 0;
+    cs := Coefficients(calF); ms := Monomials(calF);
+    f := &+[R!Evaluate(kx!Eltseq(cs[i]),k!12)
+        *t^Degree(ms[i],1)*v^Degree(ms[i],2) : i in [1..#cs]];
+    assert Degree(f) eq 23 and IsIrreducible(f);
+    G := GaloisGroup(f);
+    assert IsConjugate(Sym(23),G,TransitiveGroup(23,5));
+    print "calF modulo (31,s-12): conditional group identification M23.";
 end if;

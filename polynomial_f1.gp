@@ -1,9 +1,5 @@
-\\ ============================================================================
-\\ polynomial_f1.gp   --   f1(x) in Z[x], degree 23, Galois group M23
-\\ ----------------------------------------------------------------------------
-\\ PARI/GP source.  Load with:  gp -q polynomial_f1.gp   or   read("polynomial_f1.gp")
-\\ Gal(f1/Q) = M23 is certified in Magma by verify.m.
-\\ ============================================================================
+\\ f1(x) in Z[x], degree 23.
+\\ Group identification and optional GaloisProof: verify.m.
 
 f1 = 0;
 f1 += (-3150159884154)*x^0;
@@ -30,12 +26,8 @@ f1 += (-1150)*x^20;
 f1 += (-184)*x^21;
 f1 += (1)*x^23;
 
-\\ ---------------------------------------------------------------------------
-\\ Self-check.  In gp:   f1_selfcheck() == f1_expect
-\\ must return 1.  Fields:
-\\   [deg, #monomials, #digits, largest coefficient in digits, content,
-\\    f1(3) mod 2^61-1]
-\\ ---------------------------------------------------------------------------
+\\ Fingerprint: degree, nonzero terms, total coefficient digits, maximum digits,
+\\ content, and f1(3) modulo 2^61-1.
 f1_expect = [23, 23, 219, 14, 1, 92254275456192];
 
 f1_selfcheck() =
@@ -49,3 +41,4 @@ f1_selfcheck() =
   [poldegree(f1, x), nz, dg, mx, ct, lift(Mod(subst(f1, x, 3), 2^61 - 1))];
 }
 
+if(f1_selfcheck() != f1_expect, error("f1: coefficient check failed"));

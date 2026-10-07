@@ -1,15 +1,8 @@
-\\ ============================================================================
-\\ polynomial_F.gp   --   F(V,T), monic of degree 23 over Q(T)
-\\ ----------------------------------------------------------------------------
-\\ PARI/GP source file.  Load with:      gp -q polynomial_F.gp
-\\                       or inside gp:   read("polynomial_F.gp")
-\\ Definition:
-\\        F(V,T) = V^23 + sum_{k=2}^{23} a_k(T) * V^(23-k),      a_1 = 0,
-\\        a_k(T)  = b_k(T) / (T^2+23)^floor(5k/23),    b_k in Z[T],
-\\        deg b_k = 2*floor(5k/23)  (attained for every k).
-\\ ============================================================================
+\\ Earlier model F8 in Q(T)[V], monic of degree 23 in V.
+\\ F8 = V^23 + sum_{k=2}^{23} b[k]*V^(23-k)/(T^2+23)^floor(5*k/23).
+\\ F8int = (T^2+23)^4*F8 lies in Z[T,V] and has bidegree (8,23).
 
-\\ create V before T 
+\\ create V before T
 V; T;
 
 b = vector(23);
@@ -177,18 +170,15 @@ b[23] += (172171892687016253525660128823927540899840)*T^8;
 b[23] += (29729556023869614361220075333404061337600)*T^9;
 b[23] += (2001532669196828324472937945546023168000)*T^10;
 
-F = V^23 + sum(k = 2, 23, (b[k]/(T^2+23)^((5*k)\23)) * V^(23-k));
+F8 = V^23 + sum(k = 2, 23, (b[k]/(T^2+23)^((5*k)\23)) * V^(23-k));
 
-Fint = (T^2+23)^4 * F;
+F8int = (T^2+23)^4 * F8;
 
-\\ ---------------------------------------------------------------------------
-\\ Self-check.  In gp:   F_selfcheck() == F_expect  must return 1.
-\\ Fields: [deg_V F, deg_T Fint, #nonzero coefficients of b, #digits,
-\\    largest coefficient in digits, content(Fint), Fint(3,5) mod 2^61-1]
-\\ ---------------------------------------------------------------------------
-F_expect = [23, 8, 119, 3756, 46, 1, 266476012202556735];
+\\ Fingerprint: deg_V F8, deg_T F8int, nonzero terms in b, total coefficient
+\\ digits, maximum digits, content(F8int), and F8int(V=3,T=5) modulo 2^61-1.
+F8_expect = [23, 8, 119, 3756, 46, 1, 266476012202556735];
 
-F_selfcheck() =
+F8_selfcheck() =
 {
   my(nz = 0, dg = 0, mx = 0, ct = 0, c, L);
   for(k = 2, 23,
@@ -199,10 +189,11 @@ F_selfcheck() =
   );
   for(i = 0, 23,
     for(j = 0, 8,
-      ct = gcd(ct, polcoef(polcoef(Fint, i, V), j, T))
+      ct = gcd(ct, polcoef(polcoef(F8int, i, V), j, T))
     )
   );
-  [poldegree(F, V), poldegree(Fint, T), nz, dg, mx, ct,
-   lift(Mod(subst(subst(Fint, V, 3), T, 5), 2^61 - 1))];
+  [poldegree(F8, V), poldegree(F8int, T), nz, dg, mx, ct,
+   lift(Mod(subst(subst(F8int, V, 3), T, 5), 2^61 - 1))];
 }
 
+if(F8_selfcheck() != F8_expect, error("F8: coefficient check failed"));
