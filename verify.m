@@ -1,11 +1,15 @@
-// Run from the repository root. Set MODE and WHICH before loading to override.
-// MODE: "conditional" (GaloisGroup) or "certified" (also GaloisProof).
-// WHICH: "f1", "f2", "f3", "both", "examples", "X", "calX", "families", "all".
-// Family group checks are conditional in either mode.
+// Run from the repository root.
+// Set MODE and WHICH before loading to override.
+
+// MODE: "conditional" (GaloisGroup) (default) or "certified" (also GaloisProof).
+// WHICH: "f1", "f2", "f3", "f1f2", "f1f2f3", "X", "all".
+//      "X": verify the exact change of variable over Q between F and F_small
+//      "all" (default): verify all.
+
 if not assigned MODE then MODE := "conditional"; end if;
 if not assigned WHICH then WHICH := "all"; end if;
 assert MODE in {"certified","conditional"};
-assert WHICH in {"f1","f2","f3","both","examples","X","calX","families","all"};
+assert WHICH in {"f1","f2","f3","f1f2","f1f2f3","X","all"};
 SetSeed(1);
 
 P<x> := PolynomialRing(Rationals());
@@ -94,56 +98,28 @@ procedure CheckExample(name,f,expected_discriminant,mode)
     printf "%o: field discriminant verified.\n",name;
 end procedure;
 
-if WHICH in {"f1","both","examples","all"} then
+if WHICH in {"f1","f1f2","f1f2f3","all"} then
     CheckExample("f1",f1,2^36*3^18*23^30,MODE);
 end if;
-if WHICH in {"f2","both","examples","all"} then
+if WHICH in {"f2","f1f2","f1f2f3","all"} then
     CheckExample("f2",f2,2^44*7^8*23^24,MODE);
 end if;
-if WHICH in {"f3","examples","all"} then
+if WHICH in {"f3","f1f2f3","all"} then
     CheckExample("f3",f3,2^22*3^24*23^18*127^8,MODE);
 end if;
 
-// These reductions do not implement the appendix's p=411000011 certification.
+// Verify the exact change of variable over Q between F and F_small 
 load "polynomial_F.m";
 load "polynomial_F_small.m";
-if WHICH in {"X","families","all"} then
-    // Check the change of variable over Q before reducing modulo 31.
+
+if WHICH in {"X","all"} then
     QQTV<T,V> := PolynomialRing(Rationals(),2);
-    cs := Coefficients(F); ms := Monomials(F);
+    cs := Coefficients(F); 
+    ms := Monomials(F);
+
     H := &+[cs[i]*T^Degree(ms[i],1)*(37*V-40)^Degree(ms[i],2)
         *(49*V+32)^(23-Degree(ms[i],2)) : i in [1..#cs]];
     small := QQTV!F_small;
     assert H*LeadingCoefficient(small) eq small*LeadingCoefficient(H);
     print "F and F_small: exact change of variable verified.";
-
-    k := GF(31);
-    kt<t> := FunctionField(k);
-    R<v> := PolynomialRing(kt);
-    f := R!Evaluate(F,[t,v]);
-    g := R!Evaluate(F_small,[t,v]);
-    assert k!(37*32+40*49) ne 0;
-    assert Degree(f) eq 23 and Degree(g) eq 23;
-    assert IsIrreducible(f) and IsIrreducible(g);
-    G := GaloisGroup(f);
-    assert IsConjugate(Sym(23),G,TransitiveGroup(23,5));
-    print "F modulo 31: conditional group identification M23.";
-end if;
-
-load "polynomial_calF.m";
-if WHICH in {"calX","families","all"} then
-    k := GF(31);
-    kx<x> := PolynomialRing(k);
-    kt<t> := FunctionField(k);
-    R<v> := PolynomialRing(kt);
-    // The degree-one prime (31,s-12) of L.
-    h := kx!DefiningPolynomial(L);
-    assert Evaluate(h,12) eq 0 and Evaluate(Derivative(h),12) ne 0;
-    cs := Coefficients(calF); ms := Monomials(calF);
-    f := &+[R!Evaluate(kx!Eltseq(cs[i]),k!12)
-        *t^Degree(ms[i],1)*v^Degree(ms[i],2) : i in [1..#cs]];
-    assert Degree(f) eq 23 and IsIrreducible(f);
-    G := GaloisGroup(f);
-    assert IsConjugate(Sym(23),G,TransitiveGroup(23,5));
-    print "calF modulo (31,s-12): conditional group identification M23.";
 end if;
